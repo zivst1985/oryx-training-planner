@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Oryx Training Planner</title>
+<meta name="description" content="Check whether a customer suits Oryx near vision training, build their training plan and show what to expect.">
+<style>
+:root{
+  --bg:#f5f7fa;--card:#fff;--ink:#1d2733;--muted:#5b6776;--line:#dde3ea;--brand:#1f3a5f;--brand-2:#2f5d8f;
+  --ok:#2e7d32;--ok-bg:#e3f2e6;--warn:#a86a12;--warn-bg:#fff4d6;--bad:#c62828;--bad-bg:#fbe3e1;--focus:#2f5d8f;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#11161d;--card:#1a212b;--ink:#e6ebf1;--muted:#9aa6b4;--line:#2c3643;--brand:#8fb4e3;--brand-2:#a9c6ec;
+  --ok:#7cc884;--ok-bg:#16301b;--warn:#f0c062;--warn-bg:#3a2e12;--bad:#f08a84;--bad-bg:#3a1a19;--focus:#8fb4e3;}
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:760px;margin:0 auto;padding:20px 16px 48px}
+header h1{margin:0;font-size:24px;color:var(--brand)}
+header p{margin:4px 0 0;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-top:16px}
+.card h2{margin:0 0 4px;font-size:17px}
+.step{display:inline-block;background:var(--brand);color:var(--card);border-radius:999px;width:22px;height:22px;text-align:center;font-size:13px;line-height:22px;margin-right:8px}
+.hint{color:var(--muted);font-size:13px;margin:0 0 12px}
+.drop{display:block;border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;cursor:pointer;transition:border-color .15s}
+.drop:hover,.drop.over{border-color:var(--brand-2)}
+.drop input{display:none}
+.drop strong{color:var(--brand-2)}
+#preview{margin-top:12px;display:none}
+#preview img,#preview canvas{max-width:100%;max-height:340px;border:1px solid var(--line);border-radius:8px;display:block;margin:0 auto}
+.status{margin-top:10px;font-size:14px;color:var(--muted)}
+.status.err{color:var(--bad)}
+progress{width:100%;height:6px;margin-top:6px}
+table{width:100%;border-collapse:collapse}
+th,td{padding:6px 4px;text-align:left}
+th{font-size:13px;color:var(--muted);font-weight:600}
+input[type=text],input[type=number],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+input:focus,select:focus,button:focus-visible,.drop:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.row{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:560px){.row{grid-template-columns:1fr 1fr 1fr}}
+label.q{display:block;font-size:14px;font-weight:600;margin-bottom:4px}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg label{border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:14px}
+.seg input{margin-right:4px}
+details{margin-top:14px}
+summary{cursor:pointer;font-weight:600}
+.checks{display:grid;gap:6px;margin-top:10px}
+.checks label{font-size:14px}
+.checks .tag{font-size:11px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:6px}
+.tag.stop{background:var(--bad-bg);color:var(--bad)}
+.tag.check{background:var(--warn-bg);color:var(--warn)}
+button.primary{margin-top:16px;width:100%;padding:13px;border:0;border-radius:10px;background:var(--brand);color:var(--card);font:600 16px system-ui,Arial,sans-serif;cursor:pointer}
+button.link{background:none;border:0;color:var(--brand-2);cursor:pointer;padding:0;font:inherit;text-decoration:underline}
+#result.ok{background:var(--ok-bg);border-color:var(--ok)}
+#result.check{background:var(--warn-bg);border-color:var(--warn)}
+#result.bad{background:var(--bad-bg);border-color:var(--bad)}
+#verdict{font-size:22px;font-weight:700;margin:0}
+#result.ok #verdict{color:var(--ok)}#result.check #verdict{color:var(--warn)}#result.bad #verdict{color:var(--bad)}
+#reasons{margin:8px 0 0;padding-left:20px}
+#reminder{margin-top:10px;font-size:14px}
+pre{white-space:pre-wrap;font-size:12px;background:var(--bg);padding:8px;border-radius:6px;max-height:200px;overflow:auto}
+/* step 4: situations */
+.sitgrid{display:grid;grid-template-columns:1fr;gap:8px;margin-top:6px}
+@media(min-width:560px){.sitgrid{grid-template-columns:1fr 1fr 1fr}}
+.catcol h3{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:6px 0 6px}
+.sit{display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px 10px;font:inherit;font-size:14px;cursor:pointer;margin-bottom:8px}
+.sit .rk{flex:0 0 22px;height:22px;border-radius:999px;border:1px solid var(--line);font-size:12px;line-height:20px;text-align:center;color:var(--muted)}
+.sit.on{border-color:var(--brand-2);box-shadow:inset 0 0 0 1px var(--brand-2)}
+.sit.on .rk{background:var(--brand);border-color:var(--brand);color:var(--card);font-weight:700}
+.sitbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px;font-size:14px;color:var(--muted)}
+.btn2{background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit;font-size:14px;color:var(--ink);cursor:pointer}
+.btn2.on{border-color:var(--brand-2);color:var(--brand-2);font-weight:600}
+/* plan output */
+.out{display:grid;gap:16px;margin-top:16px}
+.out .card{margin-top:0}
+.out h2{font-size:17px;margin:0 0 8px}
+.grp{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;border-radius:6px;padding:3px 8px;background:var(--bg);color:var(--brand-2);border:1px solid var(--line)}
+.kv{width:100%;border-collapse:collapse;font-size:14px}
+.kv th{width:34%;vertical-align:top;color:var(--muted);font-weight:600;padding:7px 8px 7px 0;border-top:1px solid var(--line)}
+.kv td{padding:7px 0;border-top:1px solid var(--line)}
+.kv ol{margin:0;padding-left:18px}
+.bars{display:grid;gap:6px;margin:4px 0}
+.bar{display:grid;grid-template-columns:120px 1fr 44px;gap:8px;align-items:center;font-size:13px}
+.bar i{display:block;height:8px;border-radius:4px;background:var(--brand-2)}
+.bar span.t{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:8px 0 4px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:10px}
+.stat b{display:block;font-size:20px;color:var(--brand);font-variant-numeric:tabular-nums}
+.stat span{font-size:13px;color:var(--muted)}
+.note{font-size:13px;color:var(--muted)}
+.locked{opacity:.55}
+.copyrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+textarea#copybox{width:100%;min-height:120px;margin-top:8px;font:12px/1.4 ui-monospace,monospace;border:1px solid var(--line);border-radius:8px;padding:8px;background:var(--bg);color:var(--ink)}
+footer{margin-top:20px;font-size:12px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Oryx Training Planner</h1>
+  <p>Four steps: the prescription, a few questions, the situations that bother the customer – then you get the eligibility result, the training plan and what to expect.</p>
+</header>
+
+<section class="card">
+  <h2><span class="step">1</span>Upload the prescription</h2>
+  <p class="hint">PDF, JPG, PNG, GIF, WEBP or BMP. The file is read on this device only – nothing is uploaded.</p>
+  <label class="drop" id="drop" tabindex="0">
+    <input type="file" id="file" accept="image/*,application/pdf,.pdf">
+    <div><strong>Choose a file</strong> or drop it here</div>
+  </label>
+  <div id="preview"></div>
+  <div class="status" id="status" role="status"></div>
+  <progress id="prog" max="1" value="0" hidden></progress>
+</section>
+
+<section class="card">
+  <h2><span class="step">2</span>Check the prescription values</h2>
+  <p class="hint">Filled in automatically when possible – always compare with the prescription and correct if needed. Leave empty if there is no value (e.g. no CYL).</p>
+  <table>
+    <thead><tr><th></th><th>SPH</th><th>CYL</th><th>ADD</th></tr></thead>
+    <tbody>
+      <tr><th>Right (OD)</th><td><input type="text" inputmode="decimal" id="sphR" placeholder="e.g. −2.25"></td><td><input type="text" inputmode="decimal" id="cylR" placeholder="—"></td><td rowspan="2" style="vertical-align:middle"><input type="text" inputmode="decimal" id="add" placeholder="e.g. +1.50"></td></tr>
+      <tr><th>Left (OS)</th><td><input type="text" inputmode="decimal" id="sphL"></td><td><input type="text" inputmode="decimal" id="cylL" placeholder="—"></td></tr>
+    </tbody>
+  </table>
+  <p class="hint" style="margin-top:8px">No prescription for distance? Leave SPH empty. No prescription at all? Enter the number on their reading glasses as ADD.</p>
+  <details><summary>Show the text read from the file</summary><pre id="ocr">Nothing read yet.</pre></details>
+</section>
+
+<section class="card">
+  <h2><span class="step">3</span>Ask the customer</h2>
+  <div class="row">
+    <div><label class="q" for="age">Age</label><input type="number" id="age" min="10" max="110" placeholder="years"><div class="hint" id="ageNote" style="margin:4px 0 0"></div></div>
+    <div><span class="q" style="display:block;font-size:14px;font-weight:600;margin-bottom:4px">Wears distance glasses all day?</span>
+      <div class="seg"><label><input type="radio" name="allday" value="yes">Yes</label><label><input type="radio" name="allday" value="no">No</label><label><input type="radio" name="allday" value="na" checked>N/A</label></div></div>
+    <div><span class="q" style="display:block;font-size:14px;font-weight:600;margin-bottom:4px">Takes them off to read?</span>
+      <div class="seg"><label><input type="radio" name="offread" value="yes">Yes</label><label><input type="radio" name="offread" value="no">No</label><label><input type="radio" name="offread" value="na" checked>N/A</label></div></div>
+  </div>
+  <details>
+    <summary>Lenses &amp; health (tick anything that applies)</summary>
+    <div class="checks">
+      <label><input type="checkbox" data-k="stop" data-r="Progressive, bifocal or multifocal lenses"> Progressive, bifocal or multifocal glasses / contact lenses<span class="tag stop">STOP</span></label>
+      <label><input type="checkbox" data-k="stop" data-r="Monovision"> Monovision (one eye for distance, one for near)<span class="tag stop">STOP</span></label>
+      <label><input type="checkbox" data-k="stop" data-r="Eye disease"> Eye disease (glaucoma, cataract, macular degeneration, diabetic eye disease, keratoconus, retinal disease)<span class="tag stop">STOP</span></label>
+      <label><input type="checkbox" data-k="stop" data-r="Cataract surgery / lens implant"> Cataract surgery / lens implant<span class="tag stop">STOP</span></label>
+      <label><input type="checkbox" data-k="stop" data-r="Lazy eye, turning eye or eye-muscle surgery"> Lazy eye, turning eye or eye-muscle surgery<span class="tag stop">STOP</span></label>
+      <label><input type="checkbox" data-k="stop" data-r="Neurological condition"> Stroke, epilepsy / seizures, MS, Parkinson’s, brain injury<span class="tag stop">STOP</span></label>
+      <label><input type="checkbox" data-k="check" data-r="One eye sees clearly worse"> One eye sees clearly worse than the other<span class="tag check">CHECK</span></label>
+      <label><input type="checkbox" data-k="check" data-r="Past laser eye surgery (LASIK/PRK)"> Past laser eye surgery (LASIK / PRK)<span class="tag check">CHECK</span></label>
+      <label><input type="checkbox" data-k="check" data-r="Other eye treatment or prescribed drops"> Other eye treatment or prescribed eye drops<span class="tag check">CHECK</span></label>
+      <label><input type="checkbox" data-k="check" data-r="Eye patching as a child"> Eye patching as a child<span class="tag check">CHECK</span></label>
+      <label><input type="checkbox" data-k="check" data-r="Other medical or neurological condition"> Other medical or neurological condition<span class="tag check">CHECK</span></label>
+    </div>
+  </details>
+</section>
+
+<section class="card">
+  <h2><span class="step">4</span>Which situations are hard for the customer?</h2>
+  <p class="hint">Tap the situations that bother them, hardest first, then the next, and so on. Only what really bothers them. Tap again to undo. This sets the focus of the training.</p>
+  <div class="sitgrid" id="sitgrid"></div>
+  <div class="sitbar"><span id="sithint">Tap the hardest situation first.</span>
+    <button type="button" class="btn2" id="sitnone">None of these is hard for me</button>
+    <button type="button" class="btn2" id="sitreset">Start over</button></div>
+  <button class="primary" id="go">Check eligibility &amp; build the plan</button>
+</section>
+
+<div class="out" id="out" hidden aria-live="polite">
+  <section class="card" id="result">
+    <p id="verdict"></p>
+    <ul id="reasons"></ul>
+    <p id="reminder"></p>
+  </section>
+  <section class="card" id="plan"></section>
+  <section class="card" id="expect"></section>
+  <section class="card">
+    <div class="copyrow"><button type="button" class="btn2" id="copysum">Copy summary</button><span class="note" id="copystat" role="status"></span>
+    <button class="link" id="reset" style="margin-left:auto">Start a new customer</button></div>
+    <textarea id="copybox" readonly hidden aria-label="Summary text"></textarea>
+  </section>
+</div>
+
+<footer>Eligibility: Oryx–Eligibility Guide. Training plan: Near Vision Training Profile rules. Expectations: Bar-Ilan University study data (43 trainees aged 42–72, IVSS 2026; long-term group n = 18). A screening aid for the sales team – the company optometrist has the final say.</footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* ---------- numbers ---------- */
+function num(v){
+  if(v==null) return null;
+  let s=String(v).trim().replace(/[−–—]/g,'-').replace(',', '.').replace(/\s+/g,'');
+  if(s==='') return null;
+  if(/^(pl|plano|pln|0)$/i.test(s)) return 0;
+  const n=parseFloat(s);
+  return isNaN(n)?null:n;
+}
+const fmt = n => n==null ? '—' : (n>0?'+':n<0?'−':'')+Math.abs(n).toFixed(2);
+
+/* ---------- eligibility rules (Oryx–Eligibility Guide) ---------- */
+function evaluate(d){
+  const stop=[], check=[], ok=[];
+  const {age, sphR, sphL, cylR, cylL, add, allday, offread, flags} = d;
+
+  if(age==null) check.push('Age is missing – it is not on the form, please ask the customer');
+  else if(age<35) stop.push(`Age ${age} – under 35`);
+  else if(age>60) check.push(`Age ${age} – over 60`);
+
+  flags.filter(f=>f.k==='stop').forEach(f=>stop.push(f.r));
+  flags.filter(f=>f.k==='check').forEach(f=>check.push(f.r));
+
+  const eyes=[['Right',sphR],['Left',sphL]];
+  const addv = add==null?0:add;
+  for(const [eye,s] of eyes){
+    if(s==null || (s<=0 && s>=-0.25)) continue;                     // none / 0.00 to −0.25
+    if(s < -6.00) { stop.push(`${eye} SPH ${fmt(s)} – stronger than −6.00`); continue; }
+    if(s > 2.00)  { stop.push(`${eye} SPH ${fmt(s)} – above +2.00`); continue; }
+    if(s <= -3.00) continue;                                          // −3.00 to −6.00
+    if(s < -0.25){                                                    // −0.50 to −2.75
+      if(offread==='yes') stop.push(`${eye} SPH ${fmt(s)} and takes glasses off to read`);
+      else if(offread!=='no') check.push(`${eye} SPH ${fmt(s)} – ask whether they take their glasses off to read`);
+      continue;
+    }
+    if(s <= 0.75) continue;                                           // +0.25 to +0.75
+    // +1.00 to +2.00
+    if(allday==='yes') continue;
+    if(s + addv <= 1.75) continue;
+    check.push(`${eye} SPH ${fmt(s)} not worn all day, SPH + ADD = ${fmt(s+addv)} (above +1.75)`);
+  }
+
+  // Astigmatism above 0.50 matters only when it is not corrected, i.e. the glasses are not worn
+  for(const [eye,c] of [['Right',cylR],['Left',cylL]]){
+    if(c==null || Math.abs(c) <= 0.50 || allday==='yes') continue;
+    if(allday==='no') check.push(`${eye} CYL ${fmt(c)} – above 0.50 and the glasses are not worn all day`);
+    else check.push(`${eye} CYL ${fmt(c)} – above 0.50: ask whether they wear their distance glasses all day (if yes, this is fine)`);
+  }
+  if(add!=null && add >= 2.00) check.push(`ADD ${fmt(add)} – +2.00 or higher`);
+  if(sphR!=null || sphL!=null){
+    const diff=Math.abs((sphR??0)-(sphL??0));
+    if(diff>1.00) check.push(`Difference between eyes ${diff.toFixed(2)} – above 1.00`);
+  }
+
+  if(stop.length) return {level:'bad', title:'✘ Not suitable', reasons:stop.concat(check)};
+  if(check.length) return {level:'check', title:'? Refer to the optometrist', reasons:check};
+  return {level:'ok', title:'✔ Suitable for training', reasons:['All values are within the eligibility guide.']};
+}
+
+/* ---------- prescription text parsing ---------- */
+function parseRx(raw){
+  const text=raw.replace(/[−–—]/g,'-').replace(/(\d),(\d{2})/g,'$1.$2').replace(/(^|\s)(\d{1,2}\.\d{2})-(?=\s|$)/gm,'$1-$2').replace(/(^|[^\w.])0\s*\.?\s*([SD])\b/g,'$1O$2').replace(/\bO\s*\.?\s*D\s*\.?/gi,'OD').replace(/\bO\s*\.?\s*S\s*\.?/gi,'OS');
+  const lines=text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  const dec=/([+-]?\s?\d{1,2}\.\d{1,2})(?!\d)|\b(pl(?:ano)?)\b/gi;
+  const nums=l=>[...l.matchAll(dec)].map(m=>m[2]?0:parseFloat(m[1].replace(/\s/g,'')));
+  const out={};
+  const rRe=/(^|[^a-z])(od|r|re|rt|right|ימין)([^a-z]|$)/i, lRe=/(^|[^a-z])(os|l|le|lt|left|שמאל)([^a-z]|$)/i;
+  let adds=[];
+  for(const l of lines){
+    const am=l.match(/add(?:ition)?[^0-9+\-]{0,8}([+-]?\s?\d{1,2}\.\d{2})/i);
+    if(am) adds.push(parseFloat(am[1].replace(/\s/g,'')));
+    const isR=rRe.test(l), isL=lRe.test(l);
+    if(isR===isL) continue;
+    const ns=nums(l.replace(/add(?:ition)?[^0-9+\-]{0,8}[+-]?\s?\d{1,2}\.\d{2}/i,''));
+    if(!ns.length) continue;
+    const e=isR?'R':'L';
+    if(out['sph'+e]!==undefined) continue;
+    out['sph'+e]=ns[0];
+    const rest=l.replace(dec,' ');
+    const hasAxis=/(^|[^\d.])(\d{1,3})(?![\d.])/.test(rest.replace(/^\D*(od|os|r|l|re|le|right|left)\b/i,'')) || /[x×@]\s*\d/i.test(l);
+    if(/\bDS\b|sph(?:ere)?\s*only/i.test(l)) out['cyl'+e]=null;
+    else if(ns.length>1 && hasAxis) out['cyl'+e]=ns[1];
+    else if(ns.length>1 && !am) adds.push(ns[1]);
+    if(ns.length>2 && hasAxis && !am) adds.push(ns[2]);
+  }
+  if(adds.length) out.add=Math.max(...adds);
+  return out;
+}
+
+/* ---------- age / date of birth from the form ---------- */
+function findAge(raw){
+  const text=raw.replace(/[−–—]/g,'-');
+  const now=new Date();
+  const toYear=y=>{y=+y; if(y<100) y+= (y>now.getFullYear()%100?1900:2000); return y;};
+  const dobRe=/(d\.?\s?o\.?\s?b\.?|date\s+of\s+birth|birth\s*date|birthday|born|תאריך\s+לידה|ת\.?\s?לידה)\s*[:#\-]?\s*(\d{1,2})\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-]\s*(\d{2,4})/i;
+  const m=text.match(dobRe);
+  if(m){
+    let a=+m[2],b=+m[3],y=toYear(m[4]);
+    let mo,d; if(a>12){d=a;mo=b;} else if(b>12){mo=a;d=b;} else {mo=a;d=b;}
+    if(y>1900 && y<=now.getFullYear() && mo>=1 && mo<=12){
+      let age=now.getFullYear()-y; if(now.getMonth()+1<mo || (now.getMonth()+1===mo && now.getDate()<d)) age--;
+      if(age>=10 && age<=110) return {age, src:'date of birth '+m[2]+'/'+m[3]+'/'+m[4]};
+    }
+  }
+  const yOnly=text.match(/(d\.?\s?o\.?\s?b\.?|date\s+of\s+birth|birth\s*(?:date|year)|year\s+of\s+birth|שנת\s+לידה)\s*[:#\-]?\s*((?:19|20)\d{2})\b/i);
+  if(yOnly){ const age=now.getFullYear()-(+yOnly[2]); if(age>=10&&age<=110) return {age, src:'year of birth '+yOnly[2]}; }
+  const am=text.match(/(?:\bage|גיל)\s*[:#\-]?\s*(\d{2,3})\b/i) || text.match(/\b(\d{2,3})\s*(?:years?|yrs?)[\s\-]*old\b/i) || text.match(/\b(\d{2,3})\s*(?:y\/o|y\.o\.?|yo)\b/i) || text.match(/(?:בן|בת)\s+(\d{2,3})|(\d{2,3})\s*(?::\s*)?(?:גיל|שנים|שנה)/);
+  if(am){ const v=+(am[1]||am[2]); if(v>=10 && v<=110) return {age:v, src:'age written on the form'}; }
+  const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+  const ageFrom=(y,mo,d)=>{let a=now.getFullYear()-y; if(now.getMonth()+1<mo||(now.getMonth()+1===mo&&now.getDate()<d)) a--; return a;};
+  const cands=[];
+  for(const x of text.matchAll(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+((?:19|20)\d{2})\b/gi)) cands.push([+x[3],MON[x[1].toLowerCase()],+x[2],x[0]]);
+  for(const x of text.matchAll(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?,?\s+((?:19|20)\d{2})\b/gi)) cands.push([+x[3],MON[x[2].toLowerCase()],+x[1],x[0]]);
+  for(const x of text.matchAll(/\b(\d{1,2})\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-]\s*((?:19|20)\d{2})\b/g)){ const a=+x[1],b=+x[2]; const mo=a>12?b:a, d=a>12?a:b; cands.push([+x[3],mo,d,x[0]]); }
+  const dobMon=text.match(/(d\.?\s?o\.?\s?b\.?|date\s+of\s+birth|birth\s*date|born)\s*[:#\-]?\s*([a-z]{3,9}\.?\s+\d{1,2},?\s+(?:19|20)\d{2}|\d{1,2}\s+[a-z]{3,9}\.?,?\s+(?:19|20)\d{2})/i);
+  const ordered=dobMon?cands.sort((p,q)=>(dobMon[2].includes(q[3])?1:0)-(dobMon[2].includes(p[3])?1:0)):cands;
+  for(const [y,mo,d,src] of ordered){ const a=ageFrom(y,mo,d); if(a>=18 && a<=105) return {age:a, src:'date '+src.trim()}; }
+  return null;
+}
+
+/* ---------- table-aware parsing (uses word positions) ---------- */
+function parseLayout(data){
+  const lines=(data.lines||[]);
+  const cx=w=>(w.bbox.x0+w.bbox.x1)/2;
+  const clean=t=>t.replace(/[|:;,\[\]()]/g,'').trim();
+  let col={};
+  for(const ln of lines){
+    const ws=ln.words||[];
+    ws.forEach((w,i)=>{
+      const t=clean(w.text).toLowerCase();
+      if(/^(sph|sphere|sph\.)$/.test(t) && col.sph==null) col.sph=cx(w);
+      else if(/^(cyl|cylinder|cyl\.)$/.test(t) && col.cyl==null) col.cyl=cx(w);
+      else if(/^(axis|ax|ax\.)$/.test(t) && col.axis==null) col.axis=cx(w);
+      else if(/^int(er|ermediate)?add/.test(t)) return;
+      else if(/^(near)?(add|add\.|addition)$/.test(t)){
+        if(/^near/.test(t)){ col.add=cx(w); return; }
+        const prev=i>0?clean(ws[i-1].text).toLowerCase():'';
+        if(/^(int|intermediate|inter)$/.test(prev)) return;
+        if(col.add==null || /^near$/.test(prev)) col.add=cx(w);
+      }
+    });
+    if(col.sph!=null) break;
+  }
+  if(col.sph==null) return null;
+  if(col.add==null && col.axis!=null && col.cyl!=null) col.add=col.axis+(col.axis-col.cyl);
+  const out={}; const adds=[];
+  const decRe=/^[+\-−–—]?\d{1,2}[.,]\d{2}$|^(pl|plano)$/i;
+  for(const ln of lines){
+    const ws=(ln.words||[]).filter(w=>clean(w.text));
+    if(!ws.length) continue;
+    const lab=clean(ws[0].text).toLowerCase().replace(/^0/,'o');
+    const e=/^(od|o\.d\.?|r|re|rt|right|ימין)$/.test(lab)?'R':/^(os|o\.s\.?|l|le|lt|left|שמאל)$/.test(lab)?'L':null;
+    if(!e || out['sph'+e]!==undefined) continue;
+    const got={};
+    for(const w of ws.slice(1)){
+      const t=clean(w.text);
+      if(!decRe.test(t)) continue;
+      const v=/^pl/i.test(t)?0:num(t);
+      let best=null,bd=1e9;
+      for(const k of ['sph','cyl','axis','add']){ if(col[k]==null) continue; const d=Math.abs(cx(w)-col[k]); if(d<bd){bd=d;best=k;} }
+      if(best && best!=='axis' && got[best]===undefined) got[best]=v;
+    }
+    if(got.sph===undefined) continue;
+    out['sph'+e]=got.sph; out['cyl'+e]=got.cyl===undefined?null:got.cyl;
+    if(got.add!==undefined) adds.push(got.add);
+  }
+  if(adds.length) out.add=Math.max(...adds);
+  return Object.keys(out).length?out:null;
+}
+
+/* ---------- image clean-up: enlarge, sharpen to black/white, remove table lines ---------- */
+function cleanCanvas(src){
+  const k=src.width<2000?Math.min(2.5,2000/src.width):1;
+  const W=Math.round(src.width*k),H=Math.round(src.height*k);
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(src,0,0,W,H);
+  const im=x.getImageData(0,0,W,H),d=im.data,dark=new Uint8Array(W*H);
+  let sum=0;for(let i=0;i<W*H;i++){const g=(d[i*4]*299+d[i*4+1]*587+d[i*4+2]*114)/1000;sum+=g;dark[i]=g<150?1:0;}
+  const hMin=Math.max(80,Math.round(W*0.06)), vMin=Math.max(45,Math.round(W*0.022));
+  const kill=new Uint8Array(W*H);
+  for(let y=0;y<H;y++){let run=0;for(let xx=0;xx<=W;xx++){const on=xx<W&&dark[y*W+xx];if(on)run++;else{if(run>=hMin)for(let j=xx-run;j<xx;j++)kill[y*W+j]=1;run=0;}}}
+  for(let xx=0;xx<W;xx++){let run=0;for(let y=0;y<=H;y++){const on=y<H&&dark[y*W+xx];if(on)run++;else{if(run>=vMin)for(let j=y-run;j<y;j++)kill[j*W+xx]=1;run=0;}}}
+  for(let i=0;i<W*H;i++){const v=(dark[i]&&!kill[i])?0:255;d[i*4]=d[i*4+1]=d[i*4+2]=v;d[i*4+3]=255;}
+  x.putImageData(im,0,0);
+  return c;
+}
+
+const countRx=rx=>rx?['sphR','sphL','cylR','cylL','add'].filter(k=>rx[k]!=null).length:0;
+function bestRx(results){
+  let best={},score=-1;
+  for(const r of results){ for(const rx of [parseLayout(r.data), parseRx(r.data.text)]){ const sc=countRx(rx)+(rx&&rx.sphR!=null&&rx.sphL!=null?3:0); if(sc>score){score=sc;best=rx||{};} } }
+  return best;
+}
+
+/* ---------- file reading ---------- */
+const status=(t,err)=>{const s=$('status');s.textContent=t;s.className='status'+(err?' err':'');};
+const prog=$('prog');
+
+async function fileToCanvases(file){
+  const isPdf=file.type==='application/pdf'||/\.pdf$/i.test(file.name);
+  if(isPdf){
+    if(!window.pdfjsLib) throw new Error('PDF reader did not load – check the internet connection.');
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+    const pages=[];
+    for(let i=1;i<=Math.min(pdf.numPages,3);i++){
+      const page=await pdf.getPage(i);
+      const vp=page.getViewport({scale:2.5});
+      const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+      await page.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+      pages.push(c);
+    }
+    return pages;
+  }
+  const url=URL.createObjectURL(file);
+  const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=()=>rej(new Error('This image format cannot be opened in the browser. Please save it as JPG, PNG or PDF (e.g. iPhone HEIC photos).'));i.src=url;});
+  const scale=Math.min(1, 2400/Math.max(img.naturalWidth,img.naturalHeight)) * (Math.max(img.naturalWidth,img.naturalHeight)<1200?2:1);
+  const c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*scale);c.height=Math.round(img.naturalHeight*scale);
+  const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height);
+  URL.revokeObjectURL(url);
+  return [c];
+}
+
+let worker=null, hebWorker=null;
+async function getHebWorker(){
+  if(hebWorker) return hebWorker;
+  hebWorker=await Tesseract.createWorker('heb',1,{
+    workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+    corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1'
+  });
+  return hebWorker;
+}
+// Hebrew label found by the Hebrew reader + the number next to it read by the (more reliable) English reader
+function hebAgeByPosition(hebData, hebW, engList){
+  const hw=(hebData.words||[]).filter(w=>/^[:\s]*(גיל|ליג|גיל:|בן|ןב|בת|תב|ב)[:\s]*$/.test(w.text));
+  const nums=[];
+  for(const e of engList){ const f=hebW/e.w; for(const w of (e.data.words||[])){ const t=w.text.replace(/[^\d]/g,''); if(/^\d{2,3}$/.test(t)&&+t>=10&&+t<=110) nums.push({t,b:{x0:w.bbox.x0*f,x1:w.bbox.x1*f,y0:w.bbox.y0*f,y1:w.bbox.y1*f}}); } }
+  for(const h of hw){
+    const cy=(h.bbox.y0+h.bbox.y1)/2, hh=h.bbox.y1-h.bbox.y0;
+    let best=null,bd=1e9;
+    for(const o of nums){ const oy=(o.b.y0+o.b.y1)/2; if(Math.abs(oy-cy)>hh) continue;
+      const dx=Math.max(0,Math.min(Math.abs(o.b.x0-h.bbox.x1),Math.abs(h.bbox.x0-o.b.x1))); if(dx<bd){bd=dx;best=o;} }
+    if(best && bd<hh*8) return {age:+best.t, src:'age written in Hebrew on the form'};
+  }
+  return null;
+}
+// Hebrew text can come out in visual order; try each line as-is and reversed
+const withReversed=t=>t+'\n'+t.replace(/[\u05D0-\u05EA]+/g,w=>[...w].reverse().join(''));
+async function getWorker(){
+  if(worker) return worker;
+  if(!window.Tesseract) throw new Error('Text reader did not load – check the internet connection.');
+  worker=await Tesseract.createWorker('eng',1,{
+    workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/worker.min.js',
+    corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@5.1.1',
+    logger:m=>{ if(m.status==='recognizing text'){prog.hidden=false;prog.value=m.progress;} }
+  });
+  return worker;
+}
+
+async function handleFile(file){
+  if(!file) return;
+  $('preview').innerHTML='';$('preview').style.display='block';
+  status('Opening the file…');
+  try{
+    const canvases=await fileToCanvases(file);
+    const shown=document.createElement('img');shown.alt='Uploaded prescription';shown.src=canvases[0].toDataURL('image/jpeg',.85);
+    $('preview').appendChild(shown);
+    status('Reading the prescription… (the first time takes a few seconds)');
+    const w=await getWorker();
+    const results=[];
+    for(let pi=0;pi<canvases.length;pi++){
+      const c=canvases[pi];
+      const cc=cleanCanvas(c);
+      const r1=await w.recognize(cc); r1.__page=pi; r1.__w=cc.width; results.push(r1);
+      const quick=bestRx([r1]);
+      if(!(quick.sphR!=null&&quick.sphL!=null)){ const r2=await w.recognize(c); r2.__page=pi; r2.__w=c.width; results.push(r2); }
+    }
+    prog.hidden=true;
+    $('ocr').textContent=results.map(r=>r.data.text.trim()).join('\n\n---\n\n')||'(no text found)';
+    const rx=bestRx(results);
+    const allText=results.map(r=>r.data.text).join('\n');
+    const auto=[];
+    const tick=(re,key,label)=>{ if(re.test(allText)){ const cb=document.querySelector('.checks input[data-r="'+key+'"]'); if(cb&&!cb.checked){cb.checked=true;auto.push(label);} } };
+    tick(/multi\s*-?\s*focal|progressive|bifocal|varifocal|varilux/i,'Progressive, bifocal or multifocal lenses','multifocal / progressive lenses');
+    tick(/mono\s*-?\s*vision/i,'Monovision','monovision');
+    if(auto.length){ document.querySelector('.checks').closest('details').open=true; }
+    let ag=findAge(results.map(r=>r.data.text).join('\n'));
+    if(!ag){
+      try{
+        status('Looking for the age in Hebrew…');
+        const hw=await getHebWorker(); let ht='';
+        for(let i=0;i<canvases.length;i++){
+          const hc=cleanCanvas(canvases[i]);
+          const hr=await hw.recognize(hc); ht+=hr.data.text+'\n';
+          if(!ag){
+            const eng=results.filter(r=>r.__page===i).map(r=>({data:r.data,w:r.__w}));
+            if(!eng.some(e=>e.w===canvases[i].width)) eng.push({data:(await w.recognize(canvases[i])).data,w:canvases[i].width});
+            ag=hebAgeByPosition(hr.data, hc.width, eng);
+          }
+        }
+        if(!ag) ag=findAge(withReversed(ht));
+        $('ocr').textContent+='\n\n--- (Hebrew) ---\n\n'+ht.trim();
+      }catch(e){}
+    }
+    if(ag){ $('age').value=ag.age; $('ageNote').textContent='Filled from the '+ag.src+' – please check.'; }
+    else if($('age').value.trim()===''){ $('ageNote').textContent='Age was not found on the form – please ask the customer.'; }
+    const fields={sphR:'sphR',sphL:'sphL',cylR:'cylR',cylL:'cylL',add:'add'};
+    let found=0;
+    for(const k in fields){ const el=$(fields[k]); if(k in rx){ el.value=rx[k]==null?'':fmt(rx[k]); found++; } }
+    const conf=Math.max(...results.map(r=>r.data.confidence||0));
+    if(!found && conf<60){ status('This looks handwritten or unclear. The reader works on printed prescriptions only – please type the numbers in step 2, using the photo above.', true); return; }
+    status((found ? `Found ${found} value${found>1?'s':''}. Please check them against the prescription in step 2.` : 'Could not find the numbers automatically – please type them in step 2.')+(auto.length?' The form mentions '+auto.join(' and ')+' – ticked in step 3.':''), !found);
+  }catch(e){
+    prog.hidden=true;
+    status((e&&e.message)||'Could not read this file – please type the values in step 2.', true);
+  }
+}
+
+const drop=$('drop');
+$('file').addEventListener('change',e=>handleFile(e.target.files[0]));
+drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click();}});
+['dragenter','dragover'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(t=>drop.addEventListener(t,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>handleFile(e.dataTransfer.files[0]));
+
+/* ---------- step 4: situations (from the Near Vision Training Profile) ---------- */
+const CATS=['V','L','C'];
+const CAT={V:'Visual clarity',L:'Low light',C:'Low contrast'};
+const SIT={
+  V1:'Reading small print on medicine and food packages',
+  V2:'Reading messages on the phone without enlarging the text',
+  V3:'Threading a needle or working with small details',
+  L1:'Reading a menu in a dimly lit restaurant',
+  L2:'Reading in bed by a night lamp',
+  L3:'Reading signs and the car dashboard after dark',
+  C1:'Grey text on a white background on websites and apps',
+  C2:'Faded receipts or printed documents',
+  C3:'Print on a coloured background, like bottle labels'
+};
+const FOCUS={V:'High spatial frequencies, small targets near the acuity threshold',L:'Work at reduced screen luminance, mid spatial frequencies',C:'Low to mid spatial frequencies, near the contrast threshold'};
+let picks=[], noneSel=false;
+function drawSits(){
+  const g=$('sitgrid'); g.innerHTML='';
+  for(const k of CATS){
+    const col=document.createElement('div'); col.className='catcol';
+    col.innerHTML='<h3>'+CAT[k]+'</h3>';
+    for(const id of Object.keys(SIT).filter(x=>x[0]===k)){
+      const b=document.createElement('button'); b.type='button'; const i=picks.indexOf(id);
+      b.className='sit'+(i>=0?' on':''); b.setAttribute('aria-pressed',i>=0);
+      b.innerHTML='<span class="rk">'+(i>=0?i+1:'')+'</span><span></span>'; b.lastChild.textContent=SIT[id];
+      b.onclick=()=>{ noneSel=false; const j=picks.indexOf(id); if(j>=0) picks.splice(j,1); else picks.push(id); drawSits(); };
+      col.appendChild(b);
+    }
+    g.appendChild(col);
+  }
+  $('sitnone').classList.toggle('on',noneSel);
+  $('sithint').textContent = noneSel ? 'Marked: none of these is hard for the customer.' : picks.length===0 ? 'Tap the hardest situation first.' : picks.length+' picked. Keep going in order of difficulty, or stop here.';
+}
+$('sitnone').onclick=()=>{ noneSel=!noneSel; if(noneSel) picks=[]; drawSits(); };
+$('sitreset').onclick=()=>{ picks=[]; noneSel=false; drawSits(); };
+drawSits();
+
+/* ---------- training plan (Near Vision Training Profile rules) ---------- */
+function splitOf(pts){
+  const tot=CATS.reduce((a,k)=>a+pts[k],0);
+  if(tot===0) return {V:35,L:35,C:30};
+  const out={}; CATS.forEach(k=>out[k]=Math.round((10+70*pts[k]/tot)/5)*5);
+  let diff=100-CATS.reduce((a,k)=>a+out[k],0);
+  const order=CATS.slice().sort((a,b)=>pts[b]-pts[a]); let i=0;
+  while(diff!==0 && i<20){ const k=order[i%3], st=diff>0?5:-5; if(out[k]+st>=10){out[k]+=st;diff-=st;} i++; }
+  return out;
+}
+function planOf(add){
+  const n=picks.length, pts={V:0,L:0,C:0};
+  picks.forEach((id,i)=>pts[id[0]]+=n-i);
+  const tot=pts.V+pts.L+pts.C;
+  const pct={}; CATS.forEach(k=>pct[k]=tot?Math.round(pts[k]/tot*100):0);
+  const firstPos=k=>{const i=picks.findIndex(p=>p[0]===k);return i<0?99:i;};
+  const order=CATS.slice().sort((a,b)=>pts[b]-pts[a]||firstPos(a)-firstPos(b));
+  const wk = add==null ? 4 : add>=2 ? 5 : add>=1.25 ? 4 : 3;
+  return {pts,pct,order,split:splitOf(pts),wk,min:15};
+}
+
+/* ---------- what to expect (Bar-Ilan study data) ----------
+   New Oryx protocol, 43 trainees aged 42–72, best eye, Day 0 vs latest follow-up (logMAR; 0.10 = one chart line).
+   Grouped by ADD because that is what a salesperson usually knows. */
+const GROUPS=[
+  {id:1,name:'Early presbyopia',range:'ADD up to +1.25',test:a=>a<=1.25,ages:'42–50',n:13,impNear:12,impLC:11,near:0.095,lc:0.068,two:1,start:0.13,end:0.04,
+   story:'Near vision is usually still close to normal, so there is less room to improve. The main value is keeping reading comfortable without reading glasses for longer.'},
+  {id:2,name:'Moderate presbyopia',range:'ADD +1.50 to +1.75',test:a=>a>=1.5&&a<2,ages:'47–61',n:9,impNear:9,impLC:7,near:0.122,lc:0.111,two:2,start:0.38,end:0.26,
+   story:'Small print is already becoming hard. In the study everyone in this group improved at near.'},
+  {id:3,name:'Advanced presbyopia',range:'ADD +2.00 and up',test:a=>a>=2,ages:'45–72',n:21,impNear:19,impLC:19,near:0.125,lc:0.110,two:7,start:0.49,end:0.36,
+   story:'Near vision starts weakest, so the room for gain is largest: one in three gained two lines or more. Age did not limit the benefit (trainees aged 60+ improved too).'}
+];
+const lines=v=>(v/0.1).toFixed(1).replace(/\.0$/,'');
+const pctS=(a,b)=>Math.round(a/b*100)+'%';
+function groupOf(add){ return add==null?null:GROUPS.find(g=>g.test(add)); }
+
+/* ---------- run ---------- */
+let lastSummary='';
+$('go').addEventListener('click',()=>{
+  const radio=n=>document.querySelector(`input[name=${n}]:checked`).value;
+  const flags=[...document.querySelectorAll('.checks input:checked')].map(i=>({k:i.dataset.k,r:i.dataset.r}));
+  const ageV=$('age').value.trim();
+  const d={age: ageV===''?null:Number(ageV), sphR:num($('sphR').value), sphL:num($('sphL').value),
+    cylR:num($('cylR').value), cylL:num($('cylL').value), add:num($('add').value), allday:radio('allday'), offread:radio('offread'), flags};
+  const res=evaluate(d);
+  $('out').hidden=false;
+  const box=$('result'); box.className='card '+res.level;
+  $('verdict').textContent=res.title;
+  $('reasons').innerHTML=''; res.reasons.forEach(r=>{const li=document.createElement('li');li.textContent=r;$('reasons').appendChild(li);});
+  $('reminder').textContent = res.level==='bad' ? 'Decline politely. No training plan is created.' :
+    res.level==='check' ? 'Do not sell yet – book a short check with the company optometrist. The plan below is provisional until then.' :
+    'Suitable. The plan and expectations are below.';
+
+  const planEl=$('plan'), expEl=$('expect');
+  if(res.level==='bad'){ planEl.hidden=true; expEl.hidden=true; lastSummary='Oryx: NOT SUITABLE – '+res.reasons.join('; '); return; }
+  planEl.hidden=false; expEl.hidden=false;
+  const p=planOf(d.add), g=groupOf(d.add);
+  const rx=[['OD',d.sphR,d.cylR],['OS',d.sphL,d.cylL]].map(([e,s,c])=>e+' '+(s==null?'—':fmt(s))+(c!=null&&c!==0?' '+fmt(c):'')).join(' · ');
+  const wearsDist=(d.sphR!=null&&Math.abs(d.sphR)>0.25)||(d.sphL!=null&&Math.abs(d.sphL)>0.25)||(d.cylR!=null&&Math.abs(d.cylR)>0)||(d.cylL!=null&&Math.abs(d.cylL)>0);
+  const corr = wearsDist ? 'Train with their distance glasses or contact lenses ('+rx+'). No reading glasses, progressive, bifocal or multifocal lenses.' : 'No glasses needed for training (no significant distance prescription). No reading glasses.';
+  const focusTxt = noneSel||!picks.length ? 'No situation picked – even split across the three areas.' : '';
+  let h='<h2>Training plan '+(res.level==='check'?'<span class="grp">provisional</span>':'')+'</h2>';
+  h+='<p style="margin:0 0 8px">'+(g?'<span class="grp">Group '+g.id+' · '+g.name+'</span> <span class="note">'+g.range+'</span>':'<span class="note">ADD not entered – using the default frequency.</span>')+'</p>';
+  h+='<table class="kv"><tbody>';
+  h+='<tr><th>Frequency</th><td>'+p.wk+' times a week</td></tr>';
+  h+='<tr><th>Session</th><td>'+p.min+' minutes ('+p.min*p.wk+' minutes a week)</td></tr>';
+  h+='<tr><th>Focus order</th><td>'+p.order.map(k=>CAT[k]+' '+p.split[k]+'%').join(' → ')+(focusTxt?'<br><span class="note">'+focusTxt+'</span>':'')+'</td></tr>';
+  h+='<tr><th>What each block trains</th><td><ol>'+p.order.map(k=>'<li><b>'+CAT[k]+':</b> '+FOCUS[k]+'</li>').join('')+'</ol></td></tr>';
+  h+='<tr><th>Glasses during training</th><td>'+corr+'</td></tr>';
+  h+='<tr><th>Situations picked</th><td>'+(noneSel?'None is hard for the customer.':picks.length?'<ol>'+picks.map(id=>'<li>'+SIT[id]+'</li>').join('')+'</ol>':'—')+'</td></tr>';
+  h+='</tbody></table>';
+  h+='<details style="margin-top:10px"><summary>How the plan is set</summary><ul class="note"><li>Frequency by ADD: +2.00 and up = 5 times a week, +1.25 to +1.75 = 4, up to +1.00 = 3, not entered = 4.</li><li>Focus: the hardest situation gets the most points; each area’s share sets its block split (at least 10% each).</li><li>Training is always done with distance correction only.</li></ul></details>';
+  planEl.innerHTML=h;
+
+  let e='<h2>What to expect</h2>';
+  if(g){
+    e+='<p style="margin:0 0 6px"><span class="grp">Group '+g.id+' · '+g.name+'</span> <span class="note">'+g.n+' trainees in the study, aged '+g.ages+'</span></p>';
+    e+='<div class="stats">'+
+      '<div class="stat"><b>'+pctS(g.impNear,g.n)+'</b><span>improved near vision ('+g.impNear+' of '+g.n+')</span></div>'+
+      '<div class="stat"><b>+'+lines(g.near)+' line'+(lines(g.near)==='1'?'':'s')+'</b><span>average near gain on the eye chart</span></div>'+
+      '<div class="stat"><b>+'+lines(g.lc)+' line'+(lines(g.lc)==='1'?'':'s')+'</b><span>average gain for faint (low-contrast) print</span></div>'+
+      '<div class="stat"><b>'+g.two+' of '+g.n+'</b><span>gained two lines or more</span></div></div>';
+    e+='<p>'+g.story+'</p>';
+  } else {
+    e+='<p>Enter the ADD to see the expectations for the customer’s group.</p>';
+  }
+  e+='<table class="kv"><tbody>';
+  e+='<tr><th>First months</th><td>Most of the gain shows up at near: small print and faint print. Distance vision improves only a little (about half a line on average).</td></tr>';
+  e+='<tr><th>Long term</th><td>People who kept training for five years or more read about two lines smaller at near than untrained people of the same age, at normal and at low contrast. Keeping the gain needs occasional maintenance sessions.</td></tr>';
+  e+='<tr><th>What predicts more gain</th><td>Weaker near vision at the start. Age and a higher ADD did not reduce the benefit.</td></tr>';
+  e+='</tbody></table>';
+  e+='<details style="margin-top:10px"><summary>All groups side by side</summary><table class="kv"><tbody><tr><th>Group</th><td><b>Improved at near · average gain · faint print</b></td></tr>'+
+     GROUPS.map(x=>'<tr><th>'+x.id+' · '+x.range+'</th><td>'+pctS(x.impNear,x.n)+' · +'+lines(x.near)+' lines · +'+lines(x.lc)+' lines</td></tr>').join('')+'</tbody></table></details>';
+  e+='<p class="note">These are group averages from an ongoing Bar-Ilan University study (43 trainees on the new Oryx app; long-term group of 18). They are not a promise for one person. 0.10 logMAR = one line on the eye chart.</p>';
+  expEl.innerHTML=e;
+
+  lastSummary=['Oryx Training Planner',
+    'Eligibility: '+res.title.replace(/^[^A-Za-z]+/,'')+(res.level!=='ok'?' – '+res.reasons.join('; '):''),
+    'Age: '+(d.age??'—')+' · Rx: '+rx+' · ADD: '+(d.add==null?'—':fmt(d.add)),
+    g?'Group '+g.id+' – '+g.name+' ('+g.range+')':'Group: ADD not entered',
+    'Plan: '+p.wk+'×/week × '+p.min+' min · focus '+p.order.map(k=>CAT[k]+' '+p.split[k]+'%').join(' → '),
+    'Glasses: '+corr,
+    g?'Expect (study average for this group): '+pctS(g.impNear,g.n)+' improved at near, about +'+lines(g.near)+' lines near, +'+lines(g.lc)+' lines faint print.':''
+  ].filter(Boolean).join('\n');
+  $('out').scrollIntoView({behavior:'smooth',block:'start'});
+});
+$('copysum').addEventListener('click',()=>{
+  const box=$('copybox'), st=$('copystat');
+  const fb=()=>{box.hidden=false;box.value=lastSummary;box.focus();box.select();st.textContent='Copying was blocked – the text is selected below.';};
+  try{ navigator.clipboard.writeText(lastSummary).then(()=>{st.textContent='Copied';setTimeout(()=>st.textContent='',2000);},fb); }catch(err){ fb(); }
+});
+$('reset').addEventListener('click',()=>{location.reload();});
+
+window.__oryx={evaluate,parseRx,parseLayout,findAge,num};
+</script>
+</body>
+</html>
