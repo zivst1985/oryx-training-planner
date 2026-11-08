@@ -36,7 +36,7 @@ progress{width:100%;height:6px;margin-top:6px}
 table{width:100%;border-collapse:collapse}
 th,td{padding:6px 4px;text-align:left}
 th{font-size:13px;color:var(--muted);font-weight:600}
-input[type=text],input[type=number],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+input[type=text],input[type=number],input[type=date],select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
 input:focus,select:focus,button:focus-visible,.drop:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 .row{display:grid;grid-template-columns:1fr;gap:12px}
 @media(min-width:560px){.row{grid-template-columns:1fr 1fr 1fr}}
@@ -132,7 +132,7 @@ footer{margin-top:20px;font-size:12px;color:var(--muted);text-align:center}
 <section class="card">
   <h2><span class="step">3</span>Ask the customer</h2>
   <div class="row">
-    <div><label class="q" for="age">Age</label><input type="number" id="age" min="10" max="110" placeholder="years"><div class="hint" id="ageNote" style="margin:4px 0 0"></div></div>
+    <div><label class="q" for="dob">Date of birth</label><input type="date" id="dob" max=""><input type="hidden" id="age"><div class="hint" id="ageNote" style="margin:4px 0 0"></div></div>
     <div><span class="q" style="display:block;font-size:14px;font-weight:600;margin-bottom:4px">Wears distance glasses all day?</span>
       <div class="seg"><label><input type="radio" name="allday" value="yes">Yes</label><label><input type="radio" name="allday" value="no">No</label><label><input type="radio" name="allday" value="na" checked>N/A</label></div></div>
     <div><span class="q" style="display:block;font-size:14px;font-weight:600;margin-bottom:4px">Takes them off to read?</span>
@@ -206,7 +206,7 @@ function evaluate(d){
   const stop=[], check=[], ok=[];
   const {age, sphR, sphL, cylR, cylL, add, allday, offread, flags} = d;
 
-  if(age==null) check.push('Age is missing – it is not on the form, please ask the customer');
+  if(age==null) check.push('Date of birth is missing – it is not on the form, please ask the customer');
   else if(age<35) stop.push(`Age ${age} – under 35`);
   else if(age>60) check.push(`Age ${age} – over 60`);
 
@@ -280,6 +280,19 @@ function parseRx(raw){
 }
 
 /* ---------- age / date of birth from the form ---------- */
+const iso=(y,mo,d)=>y+'-'+String(mo).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+function ageFromDob(v){
+  if(!v) return null; const b=new Date(v+'T00:00:00'), n=new Date(); if(isNaN(b)) return null;
+  let a=n.getFullYear()-b.getFullYear(); const m=n.getMonth()-b.getMonth(); if(m<0||(m===0&&n.getDate()<b.getDate())) a--;
+  return (a>=0&&a<120)?a:null;
+}
+// The age field is hidden: it holds the age computed from the date of birth, or an age written on the form when there is no date
+function showAge(src){
+  const a=ageFromDob($('dob').value);
+  if(a!=null){ $('age').value=a; $('ageNote').textContent='Age '+a+(src?' – date of birth read from the form, please check.':''); }
+  else if($('age').value!==''){ $('ageNote').textContent='Age '+$('age').value+' (written on the form, no date of birth) – please check.'; }
+  else $('ageNote').textContent='';
+}
 function findAge(raw){
   const text=raw.replace(/[−–—]/g,'-');
   const now=new Date();
@@ -291,13 +304,11 @@ function findAge(raw){
     let mo,d; if(a>12){d=a;mo=b;} else if(b>12){mo=a;d=b;} else {mo=a;d=b;}
     if(y>1900 && y<=now.getFullYear() && mo>=1 && mo<=12){
       let age=now.getFullYear()-y; if(now.getMonth()+1<mo || (now.getMonth()+1===mo && now.getDate()<d)) age--;
-      if(age>=10 && age<=110) return {age, src:'date of birth '+m[2]+'/'+m[3]+'/'+m[4]};
+      if(age>=10 && age<=110) return {age, dob:iso(y,mo,d), src:'date of birth '+m[2]+'/'+m[3]+'/'+m[4]};
     }
   }
   const yOnly=text.match(/(d\.?\s?o\.?\s?b\.?|date\s+of\s+birth|birth\s*(?:date|year)|year\s+of\s+birth|שנת\s+לידה)\s*[:#\-]?\s*((?:19|20)\d{2})\b/i);
   if(yOnly){ const age=now.getFullYear()-(+yOnly[2]); if(age>=10&&age<=110) return {age, src:'year of birth '+yOnly[2]}; }
-  const am=text.match(/(?:\bage|גיל)\s*[:#\-]?\s*(\d{2,3})\b/i) || text.match(/\b(\d{2,3})\s*(?:years?|yrs?)[\s\-]*old\b/i) || text.match(/\b(\d{2,3})\s*(?:y\/o|y\.o\.?|yo)\b/i) || text.match(/(?:בן|בת)\s+(\d{2,3})|(\d{2,3})\s*(?::\s*)?(?:גיל|שנים|שנה)/);
-  if(am){ const v=+(am[1]||am[2]); if(v>=10 && v<=110) return {age:v, src:'age written on the form'}; }
   const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
   const ageFrom=(y,mo,d)=>{let a=now.getFullYear()-y; if(now.getMonth()+1<mo||(now.getMonth()+1===mo&&now.getDate()<d)) a--; return a;};
   const cands=[];
@@ -306,7 +317,9 @@ function findAge(raw){
   for(const x of text.matchAll(/\b(\d{1,2})\s*[\/.\-]\s*(\d{1,2})\s*[\/.\-]\s*((?:19|20)\d{2})\b/g)){ const a=+x[1],b=+x[2]; const mo=a>12?b:a, d=a>12?a:b; cands.push([+x[3],mo,d,x[0]]); }
   const dobMon=text.match(/(d\.?\s?o\.?\s?b\.?|date\s+of\s+birth|birth\s*date|born)\s*[:#\-]?\s*([a-z]{3,9}\.?\s+\d{1,2},?\s+(?:19|20)\d{2}|\d{1,2}\s+[a-z]{3,9}\.?,?\s+(?:19|20)\d{2})/i);
   const ordered=dobMon?cands.sort((p,q)=>(dobMon[2].includes(q[3])?1:0)-(dobMon[2].includes(p[3])?1:0)):cands;
-  for(const [y,mo,d,src] of ordered){ const a=ageFrom(y,mo,d); if(a>=18 && a<=105) return {age:a, src:'date '+src.trim()}; }
+  for(const [y,mo,d,src] of ordered){ const a=ageFrom(y,mo,d); if(a>=18 && a<=105) return {age:a, dob:iso(y,mo,d), src:'date of birth '+src.trim()}; }
+  const am=text.match(/(?:\bage|גיל)\s*[:#\-]?\s*(\d{2,3})\b/i) || text.match(/\b(\d{2,3})\s*(?:years?|yrs?)[\s\-]*old\b/i) || text.match(/\b(\d{2,3})\s*(?:y\/o|y\.o\.?|yo)\b/i) || text.match(/(?:בן|בת)\s+(\d{2,3})|(\d{2,3})\s*(?::\s*)?(?:גיל|שנים|שנה)/);
+  if(am){ const v=+(am[1]||am[2]); if(v>=10 && v<=110) return {age:v, src:'age written on the form'}; }
   return null;
 }
 
@@ -494,8 +507,9 @@ async function handleFile(file){
         $('ocr').textContent+='\n\n--- (Hebrew) ---\n\n'+ht.trim();
       }catch(e){}
     }
-    if(ag){ $('age').value=ag.age; $('ageNote').textContent='Filled from the '+ag.src+' – please check.'; }
-    else if($('age').value.trim()===''){ $('ageNote').textContent='Age was not found on the form – please ask the customer.'; }
+    if(ag && ag.dob){ $('dob').value=ag.dob; $('age').value=''; showAge(true); }
+    else if(ag){ if(!$('dob').value){ $('age').value=ag.age; showAge(); } }
+    else if(!$('dob').value){ $('ageNote').textContent='Date of birth was not found on the form – please ask the customer.'; }
     const fields={sphR:'sphR',sphL:'sphL',cylR:'cylR',cylL:'cylL',add:'add'};
     let found=0;
     for(const k in fields){ const el=$(fields[k]); if(k in rx){ el.value=rx[k]==null?'':fmt(rx[k]); found++; } }
@@ -508,6 +522,8 @@ async function handleFile(file){
   }
 }
 
+$('dob').max=new Date().toISOString().slice(0,10);
+$('dob').addEventListener('input',()=>{ $('age').value=''; showAge(); });
 const drop=$('drop');
 $('file').addEventListener('change',e=>handleFile(e.target.files[0]));
 drop.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();$('file').click();}});
@@ -593,6 +609,7 @@ let lastSummary='';
 $('go').addEventListener('click',()=>{
   const radio=n=>document.querySelector(`input[name=${n}]:checked`).value;
   const flags=[...document.querySelectorAll('.checks input:checked')].map(i=>({k:i.dataset.k,r:i.dataset.r}));
+  const dobAge=ageFromDob($('dob').value); if(dobAge!=null) $('age').value=dobAge;
   const ageV=$('age').value.trim();
   const d={age: ageV===''?null:Number(ageV), sphR:num($('sphR').value), sphL:num($('sphL').value),
     cylR:num($('cylR').value), cylL:num($('cylL').value), add:num($('add').value), allday:radio('allday'), offread:radio('offread'), flags};
@@ -650,7 +667,7 @@ $('go').addEventListener('click',()=>{
 
   lastSummary=['Oryx Training Planner',
     'Eligibility: '+res.title.replace(/^[^A-Za-z]+/,'')+(res.level!=='ok'?' – '+res.reasons.join('; '):''),
-    'Age: '+(d.age??'—')+' · Rx: '+rx+' · ADD: '+(d.add==null?'—':fmt(d.add)),
+    ($('dob').value?'Date of birth: '+$('dob').value+' · ':'')+'Age: '+(d.age??'—')+' · Rx: '+rx+' · ADD: '+(d.add==null?'—':fmt(d.add)),
     g?'Group '+g.id+' – '+g.name+' ('+g.range+')':'Group: ADD not entered',
     'Plan: '+p.wk+'×/week × '+p.min+' min · focus '+p.order.map(k=>CAT[k]+' '+p.split[k]+'%').join(' → '),
     'Glasses: '+corr,
