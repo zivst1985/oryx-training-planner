@@ -63,11 +63,13 @@ button.link{background:none;border:0;color:var(--brand-2);cursor:pointer;padding
 pre{white-space:pre-wrap;font-size:12px;background:var(--bg);padding:8px;border-radius:6px;max-height:200px;overflow:auto}
 /* step 4: situations */
 .sitgrid{display:grid;grid-template-columns:1fr;gap:8px;margin-top:6px}
-@media(min-width:560px){.sitgrid{grid-template-columns:1fr 1fr}}
-.sit{display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px 10px;font:inherit;font-size:14px;cursor:pointer;margin:0}
-.sit .rk{flex:0 0 22px;height:22px;border-radius:999px;border:1px solid var(--line);font-size:12px;line-height:20px;text-align:center;color:var(--muted)}
-.sit.on{border-color:var(--brand-2);box-shadow:inset 0 0 0 1px var(--brand-2)}
-.sit.on .rk{background:var(--brand);border-color:var(--brand);color:var(--card);font-weight:700}
+.sit{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.sit.done{border-color:var(--brand-2)}
+.sit .st{font-size:15px;margin-bottom:8px}
+.scale{display:grid;grid-template-columns:repeat(11,1fr);gap:3px}
+.scale button{min-width:0;height:34px;padding:0;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit;font-size:14px;cursor:pointer}
+.scale button.on{background:var(--brand);border-color:var(--brand);color:var(--card);font-weight:700}
+.ends{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:3px}
 .sitbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:4px;font-size:14px;color:var(--muted)}
 .btn2{background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font:inherit;font-size:14px;color:var(--ink);cursor:pointer}
 .btn2.on{border-color:var(--brand-2);color:var(--brand-2);font-weight:600}
@@ -156,11 +158,10 @@ footer{margin-top:20px;font-size:12px;color:var(--muted);text-align:center}
 </section>
 
 <section class="card">
-  <h2><span class="step">4</span>Which situations are hard for the customer?</h2>
-  <p class="hint">Tap the situations that bother them, hardest first, then the next, and so on. Only what really bothers them. Tap again to undo. This sets the focus of the training.</p>
+  <h2><span class="step">4</span>How much does each situation bother the customer?</h2>
+  <p class="hint">For each situation, pick a number from 0 to 10: 0 = does not bother them at all, 10 = bothers them the most. This sets the focus of the training.</p>
   <div class="sitgrid" id="sitgrid"></div>
-  <div class="sitbar"><span id="sithint">Tap the hardest situation first.</span>
-    <button type="button" class="btn2" id="sitnone">None of these is hard for me</button>
+  <div class="sitbar"><span id="sithint"></span>
     <button type="button" class="btn2" id="sitreset">Start over</button></div>
   <button class="primary" id="go">Check eligibility &amp; build the plan</button>
 </section>
@@ -536,33 +537,37 @@ const CAT={V:'Visual clarity',L:'Low light',C:'Low contrast'};
 const SIT={
   V1:'Reading small print on medicine and food packages',
   V2:'Reading messages on the phone without enlarging the text',
+  V3:'Threading a needle or working with small details',
   L1:'Reading a menu in a dimly lit restaurant',
   L2:'Reading in bed by a night lamp',
+  L3:'Reading signs and the car dashboard after dark',
   C1:'Grey text on a white background on websites and apps',
-  C2:'Faded receipts or printed documents'
+  C2:'Faded receipts or printed documents',
+  C3:'Print on a coloured background, like bottle labels'
 };
 const FOCUS={V:'High spatial frequencies, small targets near the acuity threshold',L:'Work at reduced screen luminance, mid spatial frequencies',C:'Low to mid spatial frequencies, near the contrast threshold'};
 // Shown in a new random order each time the page is opened, with no category headings
 const SIT_ORDER=Object.keys(SIT);
 for(let i=SIT_ORDER.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [SIT_ORDER[i],SIT_ORDER[j]]=[SIT_ORDER[j],SIT_ORDER[i]]; }
-let picks=[], noneSel=false;
+let rates={};   // situation id -> 0..10 (missing = not rated yet)
 function drawSits(){
   const g=$('sitgrid'); g.innerHTML='';
-  {
-    const col=g;
-    for(const id of SIT_ORDER){
-      const b=document.createElement('button'); b.type='button'; const i=picks.indexOf(id);
-      b.className='sit'+(i>=0?' on':''); b.setAttribute('aria-pressed',i>=0);
-      b.innerHTML='<span class="rk">'+(i>=0?i+1:'')+'</span><span></span>'; b.lastChild.textContent=SIT[id];
-      b.onclick=()=>{ noneSel=false; const j=picks.indexOf(id); if(j>=0) picks.splice(j,1); else picks.push(id); drawSits(); };
-      col.appendChild(b);
+  for(const id of SIT_ORDER){
+    const box=document.createElement('div'); box.className='sit'+(rates[id]!=null?' done':'');
+    box.innerHTML='<div class="st"></div><div class="scale" role="group"></div><div class="ends"><span>0 = not at all</span><span>10 = bothers most</span></div>';
+    box.firstChild.textContent=SIT[id]; box.querySelector('.scale').setAttribute('aria-label',SIT[id]);
+    for(let v=0;v<=10;v++){
+      const b=document.createElement('button'); b.type='button'; b.textContent=v;
+      if(rates[id]===v) b.className='on'; b.setAttribute('aria-pressed',rates[id]===v);
+      b.onclick=()=>{ rates[id]=v; drawSits(); };
+      box.querySelector('.scale').appendChild(b);
     }
+    g.appendChild(box);
   }
-  $('sitnone').classList.toggle('on',noneSel);
-  $('sithint').textContent = noneSel ? 'Marked: none of these is hard for the customer.' : picks.length===0 ? 'Tap the hardest situation first.' : picks.length+' picked. Keep going in order of difficulty, or stop here.';
+  const n=Object.keys(rates).length, tot=SIT_ORDER.length;
+  $('sithint').textContent = n===tot ? 'All '+tot+' situations rated.' : n+' of '+tot+' rated.';
 }
-$('sitnone').onclick=()=>{ noneSel=!noneSel; if(noneSel) picks=[]; drawSits(); };
-$('sitreset').onclick=()=>{ picks=[]; noneSel=false; drawSits(); };
+$('sitreset').onclick=()=>{ rates={}; drawSits(); };
 drawSits();
 
 /* ---------- training plan (Near Vision Training Profile rules) ---------- */
@@ -576,12 +581,12 @@ function splitOf(pts){
   return out;
 }
 function planOf(add){
-  const n=picks.length, pts={V:0,L:0,C:0};
-  picks.forEach((id,i)=>pts[id[0]]+=n-i);
+  const pts={V:0,L:0,C:0};
+  for(const id in rates) pts[id[0]]+=rates[id];
   const tot=pts.V+pts.L+pts.C;
   const pct={}; CATS.forEach(k=>pct[k]=tot?Math.round(pts[k]/tot*100):0);
-  const firstPos=k=>{const i=picks.findIndex(p=>p[0]===k);return i<0?99:i;};
-  const order=CATS.slice().sort((a,b)=>pts[b]-pts[a]||firstPos(a)-firstPos(b));
+  const top=k=>Math.max(0,...Object.keys(rates).filter(id=>id[0]===k).map(id=>rates[id]));
+  const order=CATS.slice().sort((a,b)=>pts[b]-pts[a]||top(b)-top(a));
   const wk = add==null ? 4 : add>=2 ? 5 : add>=1.25 ? 4 : 3;
   return {pts,pct,order,split:splitOf(pts),wk,min:15};
 }
@@ -626,7 +631,8 @@ $('go').addEventListener('click',()=>{
   const rx=[['OD',d.sphR,d.cylR],['OS',d.sphL,d.cylL]].map(([e,s,c])=>e+' '+(s==null?'—':fmt(s))+(c!=null&&c!==0?' '+fmt(c):'')).join(' · ');
   const wearsDist=(d.sphR!=null&&Math.abs(d.sphR)>0.25)||(d.sphL!=null&&Math.abs(d.sphL)>0.25)||(d.cylR!=null&&Math.abs(d.cylR)>0)||(d.cylL!=null&&Math.abs(d.cylL)>0);
   const corr = wearsDist ? 'Train with their distance glasses or contact lenses ('+rx+'). No reading glasses, progressive, bifocal or multifocal lenses.' : 'No glasses needed for training (no significant distance prescription). No reading glasses.';
-  const focusTxt = noneSel||!picks.length ? 'No situation picked – even split across the three areas.' : '';
+  const rated=Object.keys(rates), hard=rated.filter(id=>rates[id]>0).sort((a,b)=>rates[b]-rates[a]);
+  const focusTxt = !rated.length ? 'No situation rated – even split across the three areas.' : !hard.length ? 'Nothing bothers the customer (all rated 0) – even split across the three areas.' : '';
   let h='<h2>Training plan '+(res.level==='check'?'<span class="grp">provisional</span>':'')+'</h2>';
   h+='<p style="margin:0 0 8px">'+(g?'<span class="grp">Group '+g.id+' · '+g.name+'</span> <span class="note">'+g.range+'</span>':'<span class="note">ADD not entered – using the default frequency.</span>')+'</p>';
   h+='<table class="kv"><tbody>';
@@ -635,9 +641,9 @@ $('go').addEventListener('click',()=>{
   h+='<tr><th>Focus order</th><td>'+p.order.map(k=>CAT[k]+' '+p.split[k]+'%').join(' → ')+(focusTxt?'<br><span class="note">'+focusTxt+'</span>':'')+'</td></tr>';
   h+='<tr><th>What each block trains</th><td><ol>'+p.order.map(k=>'<li><b>'+CAT[k]+':</b> '+FOCUS[k]+'</li>').join('')+'</ol></td></tr>';
   h+='<tr><th>Glasses during training</th><td>'+corr+'</td></tr>';
-  h+='<tr><th>Situations picked</th><td>'+(noneSel?'None is hard for the customer.':picks.length?'<ol>'+picks.map(id=>'<li>'+SIT[id]+'</li>').join('')+'</ol>':'—')+'</td></tr>';
+  h+='<tr><th>Situation ratings (0–10)</th><td>'+(hard.length?'<ol>'+hard.map(id=>'<li>'+SIT[id]+' – <b>'+rates[id]+'</b></li>').join('')+'</ol>':rated.length?'All rated 0.':'—')+(rated.length&&rated.length<SIT_ORDER.length?'<span class="note">'+(SIT_ORDER.length-rated.length)+' not rated.</span>':'')+'</td></tr>';
   h+='</tbody></table>';
-  h+='<details style="margin-top:10px"><summary>How the plan is set</summary><ul class="note"><li>Frequency by ADD: +2.00 and up = 5 times a week, +1.25 to +1.75 = 4, up to +1.00 = 3, not entered = 4.</li><li>Focus: the hardest situation gets the most points; each area’s share sets its block split (at least 10% each).</li><li>Training is always done with distance correction only.</li></ul></details>';
+  h+='<details style="margin-top:10px"><summary>How the plan is set</summary><ul class="note"><li>Frequency by ADD: +2.00 and up = 5 times a week, +1.25 to +1.75 = 4, up to +1.00 = 3, not entered = 4.</li><li>Focus: the 0–10 ratings are added up per area (clarity, low light, low contrast); each area’s share of the total sets its block split (at least 10% each).</li><li>Training is always done with distance correction only.</li></ul></details>';
   planEl.innerHTML=h;
 
   let e='<h2>What to expect</h2>';
