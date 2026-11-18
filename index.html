@@ -63,9 +63,8 @@ button.link{background:none;border:0;color:var(--brand-2);cursor:pointer;padding
 pre{white-space:pre-wrap;font-size:12px;background:var(--bg);padding:8px;border-radius:6px;max-height:200px;overflow:auto}
 /* step 4: situations */
 .sitgrid{display:grid;grid-template-columns:1fr;gap:8px;margin-top:6px}
-@media(min-width:560px){.sitgrid{grid-template-columns:1fr 1fr 1fr}}
-.catcol h3{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:6px 0 6px}
-.sit{display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px 10px;font:inherit;font-size:14px;cursor:pointer;margin-bottom:8px}
+@media(min-width:560px){.sitgrid{grid-template-columns:1fr 1fr}}
+.sit{display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px 10px;font:inherit;font-size:14px;cursor:pointer;margin:0}
 .sit .rk{flex:0 0 22px;height:22px;border-radius:999px;border:1px solid var(--line);font-size:12px;line-height:20px;text-align:center;color:var(--muted)}
 .sit.on{border-color:var(--brand-2);box-shadow:inset 0 0 0 1px var(--brand-2)}
 .sit.on .rk{background:var(--brand);border-color:var(--brand);color:var(--card);font-weight:700}
@@ -537,29 +536,27 @@ const CAT={V:'Visual clarity',L:'Low light',C:'Low contrast'};
 const SIT={
   V1:'Reading small print on medicine and food packages',
   V2:'Reading messages on the phone without enlarging the text',
-  V3:'Threading a needle or working with small details',
   L1:'Reading a menu in a dimly lit restaurant',
   L2:'Reading in bed by a night lamp',
-  L3:'Reading signs and the car dashboard after dark',
   C1:'Grey text on a white background on websites and apps',
-  C2:'Faded receipts or printed documents',
-  C3:'Print on a coloured background, like bottle labels'
+  C2:'Faded receipts or printed documents'
 };
 const FOCUS={V:'High spatial frequencies, small targets near the acuity threshold',L:'Work at reduced screen luminance, mid spatial frequencies',C:'Low to mid spatial frequencies, near the contrast threshold'};
+// Shown in a new random order each time the page is opened, with no category headings
+const SIT_ORDER=Object.keys(SIT);
+for(let i=SIT_ORDER.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [SIT_ORDER[i],SIT_ORDER[j]]=[SIT_ORDER[j],SIT_ORDER[i]]; }
 let picks=[], noneSel=false;
 function drawSits(){
   const g=$('sitgrid'); g.innerHTML='';
-  for(const k of CATS){
-    const col=document.createElement('div'); col.className='catcol';
-    col.innerHTML='<h3>'+CAT[k]+'</h3>';
-    for(const id of Object.keys(SIT).filter(x=>x[0]===k)){
+  {
+    const col=g;
+    for(const id of SIT_ORDER){
       const b=document.createElement('button'); b.type='button'; const i=picks.indexOf(id);
       b.className='sit'+(i>=0?' on':''); b.setAttribute('aria-pressed',i>=0);
       b.innerHTML='<span class="rk">'+(i>=0?i+1:'')+'</span><span></span>'; b.lastChild.textContent=SIT[id];
       b.onclick=()=>{ noneSel=false; const j=picks.indexOf(id); if(j>=0) picks.splice(j,1); else picks.push(id); drawSits(); };
       col.appendChild(b);
     }
-    g.appendChild(col);
   }
   $('sitnone').classList.toggle('on',noneSel);
   $('sithint').textContent = noneSel ? 'Marked: none of these is hard for the customer.' : picks.length===0 ? 'Tap the hardest situation first.' : picks.length+' picked. Keep going in order of difficulty, or stop here.';
